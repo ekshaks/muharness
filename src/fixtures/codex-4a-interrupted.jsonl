@@ -1,0 +1,12 @@
+{"type":"fixture_note","harness":"codex","source":"rollout-2026-09-19T09-05-16-01a0b7bb-8cc8-7061-8df6-0d6399f62b84.jsonl","note":"Codex rollout, usage-only copy: message text, instructions and tool inputs/outputs removed"}
+{"type":"session_meta","timestamp":"2026-09-19T03:35:17.751Z","payload":{"id":"01a0b7bb-8cc8-7061-8df6-0d6399f62b84","source":"vscode","originator":"Codex Desktop","cli_version":"0.153.4","model_provider":"openai","thread_source":"user"}}
+{"type":"event_msg","timestamp":"2026-09-19T03:35:17.751Z","payload":{"type":"task_started"}}
+{"type":"response_item","timestamp":"2026-09-19T03:35:18.745Z","payload":{"type":"message","role":"developer"}}
+{"type":"response_item","timestamp":"2026-09-19T03:35:18.745Z","payload":{"type":"message","role":"developer"}}
+{"type":"response_item","timestamp":"2026-09-19T03:35:18.746Z","payload":{"type":"message","role":"developer"}}
+{"type":"response_item","timestamp":"2026-09-19T03:35:18.746Z","payload":{"type":"message","role":"user"}}
+{"type":"turn_context","timestamp":"2026-09-19T03:35:18.748Z","payload":{"model":"gpt-5.6-sol","effort":"high"}}
+{"type":"response_item","timestamp":"2026-09-19T03:35:18.780Z","payload":{"type":"message","role":"user"}}
+{"type":"event_msg","timestamp":"2026-09-19T03:35:20.378Z","payload":{"type":"token_count","info":null}}
+{"type":"response_item","timestamp":"2026-09-19T03:35:20.380Z","payload":{"type":"message","role":"developer"}}
+{"type":"event_msg","timestamp":"2026-09-19T03:35:20.382Z","payload":{"type":"turn_aborted","reason":"interrupted"}}

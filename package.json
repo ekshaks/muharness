@@ -1,0 +1,20 @@
+{
+  "name": "muharness",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "sim": "tsc && node dist/sim.js",
+    "check": "tsc && node dist/check.js",
+    "trace": "tsc && node dist/trace.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "typescript": "^5.9.3"
+  },
+  "type": "module"
+}

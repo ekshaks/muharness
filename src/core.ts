@@ -30,7 +30,7 @@ export type Event =
   | { t: 'restart'; delegated?: Id[] }                         // the process died: work in flight is lost, the log is intact (stepWorld fills `delegated`)
   | { t: 'fork'; child: ConvId; at: number }                   // a new conversation that starts from the first `at` conversation items of this one
   | { t: 'expire' }                                            // the provider dropped the cache (e.g. idle past its lifetime): the next prompt is written again
-  | { t: 'hidden'; output: number }                            // a model call on the current context whose reply is discarded (e.g. a turn-end request): billed, and it caches that prompt
+  | { t: 'hidden'; output: number; last?: true }               // a model call whose reply is discarded: on the current context (e.g. a turn-end request), or with `last` on the previous prompt (a warm)
 
 export type Effect =
   | { k: 'sample'; id: Id; prompt: Item[]; purpose: Purpose }
@@ -62,7 +62,7 @@ export interface Policies {
   context: {                                       // SEE
     assemble(s: State): 'ok' | 'compact'           // before every sample
     compacted(s: State, summary: Item): Segment[]  // context after a summary is produced
-    shape(result: Item): Item                      // tool output -> what enters context
+    shape(result: Item, call: Call): Item          // tool output -> what enters context; `call` says which tool made it
   }
   turn(s: State, reply: Item): TurnDecision        // ACT
   permission(call: Call, s: State): 'allow' | 'ask' | 'deny'
@@ -107,7 +107,7 @@ export function step(prev: State, e: Event, P: Policies): [State, Effect[]] {
     }
     case 'result':
       if (s.pending[e.item.callId!]?.st !== 'running') break
-      finish(s, P.context.shape(e.item)); settle(s, P, fx); break
+      finish(s, P.context.shape(e.item, s.pending[e.item.callId!].call)); settle(s, P, fx); break
     case 'section': {                                    // SEE: a stable segment changed; the prefix check shows the cache break
       for (const it of e.items) s.items[it.id] = it
       const ids = e.items.map(i => i.id), g = s.ctx.find(g => g.stable && g.name === e.name)
@@ -140,7 +140,7 @@ export function step(prev: State, e: Event, P: Policies): [State, Effect[]] {
     }
     case 'fork': break                                   // nothing changes here: stepWorld creates the new conversation
     case 'expire': s.lastPrompt = []; break
-    case 'hidden': charge(s, promptOf(s).map(x => x.id), e.output, P, true); break
+    case 'hidden': charge(s, e.last ? s.lastPrompt : promptOf(s).map(x => x.id), e.output, P, true); break
   }
   return [s, fx]
 }

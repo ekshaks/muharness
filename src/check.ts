@@ -2,7 +2,7 @@
 // Run: npm run check
 import { deepStrictEqual, ok, strictEqual as eq } from 'node:assert'
 import { Call, Effect, Entry, Usage, Event, HandlerFactory, Hook, ROOT, Registry, World, init, replayWorld, rollup, run, spawns, stepWorld, total, world } from './core.js'
-import { archetypes, cache, item, spawn, uid } from './policies.js'
+import { archetypes, cache, context, item, spawn, uid } from './policies.js'
 import { PRICES, importClaudeCode, replayUsage } from './import-cc.js'
 import { importCodex } from './import-codex.js'
 
@@ -114,6 +114,17 @@ check('a hook that drops an effect gets a synthetic result instead of stalling t
   ok(Object.values(w.convs[ROOT].items).some(i => i.text === 'blocked by hook'))
 })
 
+check('shape gets the call that made each result, so it can treat tools differently', () => {
+  const reg: Registry = { [ROOT]: { ...base, context: context({ keep: { bash: 0.01 } }) } }
+  const calls: Call[] = [{ id: uid('c'), tool: 'read', args: {} }, { id: uid('c'), tool: 'bash', args: {} }]
+  let r = send(mk(), reg, ROOT, input())
+  r = send(r.w, reg, ROOT, { t: 'sampled', of: sampleOf(r.fx).id, item: reply(50, calls), purpose: 'act' })
+  for (const c of [...calls].reverse()) r = send(r.w, reg, ROOT, { t: 'result', item: { ...item('tool', 1000), callId: c.id } })   // results arrive out of order
+  const size = (c: Call) => Object.values(r.w.convs[ROOT].items).find(i => i.callId === c.id)!.tokens
+  eq(size(calls[0]), 1000)                                      // the read stays exact
+  eq(size(calls[1]), 10)                                        // the test output shrinks
+})
+
 const promptTokens = (fx: { f: Effect }[]) => sampleOf(fx).prompt.reduce((n, x) => n + x.tokens, 0)
 
 check('an interrupt can leave the cut-off reply and partial tool output visible to the model', () => {
@@ -202,6 +213,23 @@ check('a fork starts from a prefix of the history, keeps the cache warm, and its
   ok(Math.abs(total(w).usd - (w.convs[ROOT].ledger.usd + w.convs['f1'].ledger.usd)) < 1e-12)
   eq(spawns(w), 0)                                              // a fork is not owned, so it is not a child
   deepStrictEqual(replayWorld(w0, entries, base), w)
+})
+
+check('a warm (hidden with last) sends the previous prompt again: all of it is a cache read, and the next call writes the reply', () => {
+  const after = (warm: Event[]) => {
+    const reg: Registry = { [ROOT]: base }
+    let r = send(mk(), reg, ROOT, input())
+    r = send(r.w, reg, ROOT, { t: 'sampled', of: sampleOf(r.fx).id, item: reply(50), purpose: 'act' })
+    const before = { ...r.w.convs[ROOT].ledger.usage }
+    for (const e of warm) r = send(r.w, reg, ROOT, e)
+    const u = r.w.convs[ROOT].ledger.usage, warmed = { read: u.cacheRead - before.cacheRead, write: u.cacheWrite - before.cacheWrite }
+    r = send(r.w, reg, ROOT, input())
+    r = send(r.w, reg, ROOT, { t: 'sampled', of: sampleOf(r.fx).id, item: reply(50), purpose: 'act' })
+    return { warmed, next: r.w.convs[ROOT].ledger.usage.cacheWrite - u.cacheWrite }
+  }
+  deepStrictEqual(after([{ t: 'hidden', output: 0, last: true }]), { warmed: { read: 1600, write: 0 }, next: 50 + 100 })   // reply and new user message
+  deepStrictEqual(after([{ t: 'hidden', output: 0 }]), { warmed: { read: 1600, write: 50 }, next: 100 })                 // a turn-end request caches the reply
+  deepStrictEqual(after([{ t: 'expire' }]), { warmed: { read: 0, write: 0 }, next: 1600 + 50 + 100 })                    // no warm: everything is written again
 })
 
 check('calibration (V16): real Claude Code sessions replay to their logged usage per call, within 10 tokens per field', () => {

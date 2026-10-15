@@ -17,6 +17,7 @@ dist/
 
 # Separate clone of someone else's repo (github.com/DevMewada1299/harness-profiler), has its own .git
 external/
+CLAUDE.md
 
 # Full-text originals of stripped fixtures (local only)
 src/fixtures/*.full.jsonl

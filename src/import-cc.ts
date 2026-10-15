@@ -9,10 +9,10 @@
 import { readFileSync } from 'node:fs'
 import { Event, Item, Policies, State, Usage, emptyLedger, init, step } from './core.js'
 import { context } from './policies.js'
-
-export const CLAUDE = { ttlMs: 3600_000, slackMs: 60_000 }   // slack: the last use (the hidden request) is a little after the logged reply
-/** $/Mtok. Claude Code writes 1-hour cache entries, billed at 2x input (5-minute ones would be 1.25x). */
-export const PRICES: Record<string, Policies['price']> = { 'claude-sonnet-5': { input: 2, write: 4, read: 0.2, output: 10 } }
+import { CLAUDE } from './timing.js'
+import { PRICES } from './prices.js'
+export { PRICES }                                         // prices live in prices.ts
+export { CLAUDE }
 
 interface ApiUsage { input_tokens: number; cache_creation_input_tokens: number; cache_read_input_tokens: number; output_tokens: number }
 interface Call { u: ApiUsage; calls: string[]; t: number; end: number; compactedFrom?: number }

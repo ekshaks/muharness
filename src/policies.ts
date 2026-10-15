@@ -1,5 +1,6 @@
 // Policy library + harness archetypes. A harness = a bundle of policies + prefix sizes + model effort.
 import { Call, CacheClass, Id, Item, Policies, Role, SpawnSpec, State, TurnDecision, forkState, promptOf, tokens } from './core.js'
+import { PRICE } from './prices.js'
 
 let n = 0
 export const uid = (p = 'i') => `${p}${++n}`
@@ -20,13 +21,17 @@ export const cache = {
 
 // ── Context: compaction threshold and tool-output truncation ──
 //   keepTail: share of conversation items kept verbatim after the summary (at least 4), counted in items, not turns
-export const context = ({ limit = Infinity, truncate = Infinity, keepTail = 0 } = {}): Policies['context'] => ({
+//   keep: share of a tool's output that enters context, by tool name (e.g. caveman shrinks test output, not source reads); then truncate
+export const context = ({ limit = Infinity, truncate = Infinity, keepTail = 0, keep = {} as Record<string, number> } = {}): Policies['context'] => ({
   assemble: s => (tokens(promptOf(s)) > limit ? 'compact' : 'ok'),
   compacted: (s, sum) => {
     const ids = s.ctx[s.ctx.length - 1].ids, k = keepTail ? Math.max(4, Math.floor(ids.length * keepTail)) : 0
     return [...s.ctx.filter(g => g.stable), { name: 'conv', ids: [sum.id, ...(k ? ids.slice(-k) : [])], stable: false }]
   },
-  shape: r => (r.tokens > truncate ? { ...r, tokens: truncate, text: `${r.text ?? ''} [truncated]` } : r),
+  shape: (r0, c) => {
+    const r = c.tool in keep ? { ...r0, tokens: Math.ceil(r0.tokens * keep[c.tool]) } : r0
+    return r.tokens > truncate ? { ...r, tokens: truncate, text: `${r.text ?? ''} [truncated]` } : r
+  },
 })
 
 // ── Turn: when to stop. `verify` re-prompts once after the model says it's done. ──
@@ -58,8 +63,7 @@ export const recover = (safe: string[] = []) => (c: Call | null) => (c === null 
 
 export const maxTurns = (k: number) => (s: State) => (s.turns >= k ? `max ${k} turns` : null)
 
-/** Illustrative list prices, $/Mtok. */
-export const PRICE = { input: 3, write: 3.75, read: 0.3, output: 15 }
+export { PRICE }                                          // prices live in prices.ts
 
 // ── Archetypes. Numbers are ILLUSTRATIVE guesses, not measurements of the real products. ──
 export interface Bundle {
@@ -101,4 +105,6 @@ export const ablations = (a = Object.fromEntries(archetypes.map(b => [b.name, b]
   vary(a.minimal, '+ compact@35k', { P: { context: context({ limit: 35_000 }) } }),
   vary(a.minimal, '+ truncate 2.5k', { P: { context: context({ truncate: 2500 }) } }),
   vary(a.memory, '- verify', { P: { turn: turn.basic } }),
+  // caveman's "read less": test and log output enter context at 1.1% of their size (its README: 18,806 -> 203 tokens); source reads stay exact
+  vary(a.rich, '+ read less', { tools: [...a.rich.tools, 'retrieve'], P: { context: context({ limit: 50_000, keep: { bash: 0.011 } }) } }),
 ]
